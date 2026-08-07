@@ -34,7 +34,7 @@ sentiment_analyzer = pipeline(
     device=0 if device == "cuda" else -1,
 )
 
-embedding_model = SentenceTransformer("./embedding_model_local")
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 train_df = pd.read_csv("data/train_data.csv")
 instruction_embeddings = np.load("data/instruction_embeddings.npy")
 
