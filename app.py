@@ -1,3 +1,4 @@
+from pathlib import Path
 from flask import Flask, request, jsonify
 import pandas as pd
 import numpy as np
@@ -13,19 +14,20 @@ from transformers import (
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
+BASE_DIR = Path(__file__).resolve().parent
 app = Flask(__name__)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Running on: {device}")
 
 
-intent_model_path = "model_final"
-intent_tokenizer = AutoTokenizer.from_pretrained(intent_model_path)
-intent_model = AutoModelForSequenceClassification.from_pretrained(intent_model_path)
+intent_model_path = BASE_DIR / "model_final"
+intent_tokenizer = AutoTokenizer.from_pretrained(str(intent_model_path))
+intent_model = AutoModelForSequenceClassification.from_pretrained(str(intent_model_path))
 intent_model.to(device)
 intent_model.eval()
 
-with open(f"{intent_model_path}/label_encoder.pkl", "rb") as f:
+with open(intent_model_path / "label_encoder.pkl", "rb") as f:
     label_encoder = pickle.load(f)
 
 sentiment_analyzer = pipeline(
@@ -35,8 +37,8 @@ sentiment_analyzer = pipeline(
 )
 
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-train_df = pd.read_csv("data/train_data.csv")
-instruction_embeddings = np.load("data/instruction_embeddings.npy")
+train_df = pd.read_csv(BASE_DIR / "data" / "train_data.csv")
+instruction_embeddings = np.load(BASE_DIR / "data" / "instruction_embeddings.npy")
 
 print("All models loaded successfully")
 

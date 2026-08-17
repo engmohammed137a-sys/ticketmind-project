@@ -9,3 +9,4 @@ numpy>=1.26.0
 datasets>=2.20.0
 evaluate>=0.4.0
 accelerate>=0.30.0
+streamlit>=1.36.0
