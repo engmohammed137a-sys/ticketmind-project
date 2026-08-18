@@ -50,24 +50,28 @@ python -m venv .venv
 pip install -r Requirements.txt
 ```
 
-### 3. تشغيل الـ API
+### 3. تشغيل واجهة Streamlit
 
 ```bash
-python app.py
+streamlit run stream_app.py
 ```
 
-### 4. تشغيل واجهة المستخدم
+### 4. إذا كنت تريد استخدام API خارجي
+
+ضع متغير البيئة `API_URL` في بيئة التشغيل، مثال:
 
 ```bash
-streamlit run stream_app.py --server.port 8501
+set API_URL=https://your-api-domain.com/analyze
 ```
 
-## نقاط النهاية
+إذا لم يتم تعيين المتغير، سيعمل التطبيق مباشرة من المنطق المحلي داخل [app.py](app.py) دون الحاجة إلى Flask أو localhost.
+
+## نقاط النهاية (لـ API منفصل)
 
 ### POST /analyze
 
 ```bash
-curl -X POST http://localhost:5000/analyze \
+curl -X POST https://your-api-domain.com/analyze \
   -H "Content-Type: application/json" \
   -d '{"message":"I want to cancel my order right now, this is ridiculous!"}'
 ```
@@ -75,7 +79,7 @@ curl -X POST http://localhost:5000/analyze \
 ### GET /health
 
 ```bash
-curl http://localhost:5000/health
+curl https://your-api-domain.com/health
 ```
 
 ## مثال الاستجابة
@@ -95,6 +99,7 @@ curl http://localhost:5000/health
 ## ملاحظات
 
 - الواجهة الحالية موجهة للمستخدم العادي وتعرض النتائج بشكل مبسط.
-- يمكن تحسين المشروع لاحقًا عبر إضافة قاعدة بيانات، دعم لغات أكثر، ودعم أفضل للردود المقترحة.
+- المشروع جاهز للاستخدام على Streamlit Cloud طالما تم تعيين `API_URL` عند الحاجة، أو ترك القيمة فارغة لاستخدام المنطق المحلي.
+- لا تستخدم `localhost` في النشر لأن هذا لا يعمل على خدمات الاستضافة مثل Streamlit Cloud.
 
 TicketMind يساعد فرق خدمة العملاء على فهم الرسالة بسرعة واختيار الرد المناسب بسهولة.
