@@ -1,12 +1,30 @@
+import importlib.util
 import os
+from pathlib import Path
 
 import requests
 import streamlit as st
 
-try:
-    from app import process_customer_message
-except Exception:  # pragma: no cover
-    process_customer_message = None
+
+def load_local_analysis():
+    app_path = Path(__file__).resolve().parent / "app.py"
+    if not app_path.exists():
+        return None
+
+    spec = importlib.util.spec_from_file_location("ticketmind_app", app_path)
+    if spec is None or spec.loader is None:
+        return None
+
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        return None
+
+    return getattr(module, "process_customer_message", None)
+
+
+process_customer_message = load_local_analysis()
 
 API_URL = os.getenv("API_URL")
 
