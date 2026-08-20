@@ -21,7 +21,27 @@ except Exception:
     SentenceTransformer = None
     SENTENCE_TRANSFORMER_AVAILABLE = False
 
-from sklearn.metrics.pairwise import cosine_similarity
+# sklearn may be unavailable in some deployment environments; provide a NumPy fallback
+try:
+    from sklearn.metrics.pairwise import cosine_similarity
+    SKLEARN_AVAILABLE = True
+except Exception:
+    SKLEARN_AVAILABLE = False
+
+    def cosine_similarity(a, b):
+        a = np.atleast_2d(a).astype(float)
+        b = np.atleast_2d(b).astype(float)
+
+        # compute norms
+        a_norm = np.linalg.norm(a, axis=1, keepdims=True)
+        b_norm = np.linalg.norm(b, axis=1, keepdims=True)
+        a_norm[a_norm == 0] = 1e-8
+        b_norm[b_norm == 0] = 1e-8
+
+        a_normed = a / a_norm
+        b_normed = b / b_norm
+
+        return np.dot(a_normed, b_normed.T)
 
 AutoModelForSequenceClassification = None
 AutoTokenizer = None
