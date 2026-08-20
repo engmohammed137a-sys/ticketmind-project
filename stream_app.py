@@ -4,16 +4,54 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import requests
 import streamlit as st
 import torch
 import torch.nn.functional as F
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 BASE_DIR = Path(__file__).resolve().parent
-API_URL = os.getenv("API_URL")
+
+# Local-only mode: this file must work without any external API or model download.
+USE_REMOTE_SENTIMENT = os.getenv("USE_REMOTE_SENTIMENT", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def resolve_local_embedding_model_path():
+    candidates = [
+        BASE_DIR / "embedding_model_local",
+        BASE_DIR / "embedding_model_local" / "model",
+    ]
+
+    for candidate in candidates:
+        if candidate.exists() and (candidate / "config.json").exists():
+            return candidate
+    return None
+
+
+def local_sentiment_fallback(text: str):
+    normalized = text.lower()
+    negative_terms = [
+        "angry", "frustrated", "bad", "terrible", "hate", "ridiculous",
+        "cancel", "problem", "issue", "wrong", "broken", "unhappy",
+        "delay", "late", "refund", "angry", "upset", "annoyed",
+    ]
+    positive_terms = [
+        "thanks", "thank you", "happy", "great", "good", "love",
+        "excellent", "nice", "satisfied", "helpful",
+    ]
+
+    negative_hits = sum(1 for term in negative_terms if term in normalized)
+    positive_hits = sum(1 for term in positive_terms if term in normalized)
+
+    if negative_hits > positive_hits:
+        score = 0.85 if negative_hits >= 2 else 0.65
+        return {"sentiment": "negative", "confidence": round(score, 4)}
+    if positive_hits > negative_hits:
+        score = 0.82 if positive_hits >= 2 else 0.62
+        return {"sentiment": "positive", "confidence": round(score, 4)}
+
+    return {"sentiment": "neutral", "confidence": 0.5}
 
 
 @st.cache_resource
@@ -29,13 +67,13 @@ def load_ticketmind_models():
     with open(intent_model_path / "label_encoder.pkl", "rb") as f:
         label_encoder = pickle.load(f)
 
-    sentiment_analyzer = pipeline(
-        "sentiment-analysis",
-        model="cardiffnlp/twitter-roberta-base-sentiment-latest",
-        device=0 if device == "cuda" else -1,
-    )
+    sentiment_analyzer = None
 
-    embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+    embedding_model_path = resolve_local_embedding_model_path()
+    if embedding_model_path is None:
+        raise RuntimeError("Missing local embedding model folder: embedding_model_local")
+
+    embedding_model = SentenceTransformer(str(embedding_model_path))
     train_df = pd.read_csv(BASE_DIR / "data" / "train_data.csv")
     instruction_embeddings = np.load(BASE_DIR / "data" / "instruction_embeddings.npy")
 
@@ -78,7 +116,12 @@ def predict_intent(text: str):
 
 
 def get_sentiment(text: str):
-    sentiment_analyzer = load_ticketmind_models()["sentiment_analyzer"]
+    model_bundle = load_ticketmind_models()
+    sentiment_analyzer = model_bundle["sentiment_analyzer"]
+
+    if sentiment_analyzer is None:
+        return local_sentiment_fallback(text)
+
     result = sentiment_analyzer(text)[0]
     return {
         "sentiment": result["label"].lower(),
@@ -208,30 +251,12 @@ st.markdown('<div class="subtitle-space"></div>', unsafe_allow_html=True)
 
 with st.sidebar:
     st.header("حالة النظام")
-    if API_URL:
-        try:
-            health = requests.get(f"{API_URL.replace('/analyze', '')}/health", timeout=5)
-            if health.status_code == 200:
-                st.success("الخدمة الخارجية تعمل")
-            else:
-                st.warning("الخدمة الخارجية تستجيب")
-        except Exception:
-            st.warning("لا يمكن الاتصال بالخدمة الخارجية")
-    else:
-        st.success("التطبيق يعمل محليًا داخل نفس الملف")
-
+    st.success("التطبيق يعمل محليًا بالكامل دون أي خدمة خارجية")
     st.markdown("---")
     st.write("تستخدم هذه الأداة نموذج تصنيف نوع الطلب ومشاعر العميل لاقتراح رد مناسب.")
 
 
 def run_analysis(message: str):
-    if API_URL:
-        response = requests.post(API_URL, json={"message": message}, timeout=120)
-        payload = response.json()
-        if response.status_code != 200:
-            raise RuntimeError(payload.get("error", "حدث خطأ غير متوقع."))
-        return payload
-
     return process_customer_message(message)
 
 
